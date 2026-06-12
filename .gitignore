@@ -1,0 +1,13 @@
+# Built binary
+/gpm
+
+# Example build artifacts
+/examples/gin-server/gin-server
+/examples/opaque-server/opaque-server
+/pkg/gpm/example/example
+
+# Release artifacts
+/dist/
+
+# macOS
+.DS_Store
