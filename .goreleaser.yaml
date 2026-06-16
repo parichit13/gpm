@@ -1,0 +1,56 @@
+# GoReleaser v2 — builds cross-platform binaries and publishes a GitHub Release.
+# Triggered by CI on a pushed `v*` tag. Validate locally with: goreleaser check
+version: 2
+
+project_name: gpm
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: gpm
+    main: .
+    binary: gpm
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    # Version is baked into the cmd package so `gpm version` / self-update see
+    # the exact release tag.
+    ldflags:
+      - -s -w -X github.com/parichit13/gpm/cmd.Version={{ .Tag }}
+
+archives:
+  # Ship raw binaries named gpm_<os>_<arch> — what install.sh and `gpm update`
+  # download directly (no tarball to extract).
+  - id: gpm
+    formats: [binary]
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+release:
+  github:
+    owner: parichit13
+    name: gpm
+  draft: false
+  prerelease: auto
+
+# NOTE: A Homebrew tap channel lives on the `homebrew-support` branch (see
+# HOMEBREW.md there). The curl install script + `gpm update` are the default
+# install/update path and don't depend on it.
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"

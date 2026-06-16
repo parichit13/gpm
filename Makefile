@@ -1,6 +1,6 @@
 BINARY    := gpm
 VERSION   := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
-LDFLAGS   := -ldflags "-X main.Version=$(VERSION) -s -w"
+LDFLAGS   := -ldflags "-X github.com/parichit13/gpm/cmd.Version=$(VERSION) -s -w"
 INSTALL   := /usr/local/bin/$(BINARY)
 
 .PHONY: build install uninstall clean test run-daemon
@@ -30,12 +30,15 @@ clean:
 test:
 	go test ./...
 
+# Local cross-compile for manual release uploads. Asset names match what the
+# installer and `gpm update` expect (gpm_<os>_<arch>). CI normally uses
+# GoReleaser instead (see .goreleaser.yaml).
 release-linux:
-	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o dist/$(BINARY)-linux-amd64 .
-	GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o dist/$(BINARY)-linux-arm64 .
+	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o dist/$(BINARY)_linux_amd64 .
+	GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o dist/$(BINARY)_linux_arm64 .
 
 release-darwin:
-	GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o dist/$(BINARY)-darwin-amd64 .
-	GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o dist/$(BINARY)-darwin-arm64 .
+	GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o dist/$(BINARY)_darwin_amd64 .
+	GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o dist/$(BINARY)_darwin_arm64 .
 
 release: release-linux release-darwin

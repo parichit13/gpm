@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/parichit/gpm/pkg/gpm"
+	"github.com/parichit13/gpm/pkg/gpm"
 )
 
 // Version is set at build time with -ldflags "-X main.Version=v2", or at run

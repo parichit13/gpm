@@ -1,12 +1,12 @@
-module github.com/parichit/gpm/examples/gin-server
+module github.com/parichit13/gpm/examples/gin-server
 
 go 1.26.1
 
-replace github.com/parichit/gpm => ../..
+replace github.com/parichit13/gpm => ../..
 
 require (
 	github.com/gin-gonic/gin v1.12.0
-	github.com/parichit/gpm v0.0.0-00010101000000-000000000000
+	github.com/parichit13/gpm v0.0.0-00010101000000-000000000000
 )
 
 require (

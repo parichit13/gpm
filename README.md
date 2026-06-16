@@ -88,61 +88,82 @@ old version keeps serving.
 
 ## Install
 
+**One-line install** (macOS / Linux) — downloads the right prebuilt binary,
+verifies its checksum, installs to `~/.gpm/bin`, adds it to your `PATH`, and
+starts the daemon:
+
 ```bash
-git clone https://github.com/you/gpm
-cd gpm
-make install        # builds and copies to /usr/local/bin
+curl -fsSL https://raw.githubusercontent.com/parichit13/gpm/main/install.sh | bash
 ```
 
-Or just build:
+**Updating** — check for and install new versions:
 
 ```bash
-go build -o gpm .
+gpm update --check    # report whether a newer version is available
+gpm update            # download + install the latest, then restart the daemon
+gpm version           # show the installed version
+```
+
+**From source** (for development):
+
+```bash
+git clone https://github.com/parichit13/gpm
+cd gpm
+make install          # builds and installs to /usr/local/bin
 ```
 
 ## Quick Start
 
-```bash
-# 1. Start the daemon (once per boot, or add to startup)
-gpm daemon start
+The daemon **starts automatically** the first time you run any command (and
+after a reboot), so you can go straight to managing services:
 
-# 2. Start your app
+```bash
+# Start your app (the daemon auto-starts if it isn't already running)
 gpm start ./myserver myserver
 
-# 3. Check status
+# Check status — each service gets a stable integer id
 gpm list
 
-# 4. View logs
-gpm logs myserver
-gpm logs myserver --follow      # tail -f style
+# Commands accept the id OR the name
+gpm logs 0            # or: gpm logs myserver
+gpm reload 0
+gpm stop myserver
 
-# 5. Save list so it survives reboots
+# Persist the process list so `gpm resurrect` can bring it all back later
 gpm save
-
-# On next boot:
-gpm daemon start
 gpm resurrect
+```
+
+The daemon is managed for you, but you can still control it manually:
+
+```bash
+gpm daemon status     # running / NOT running
+gpm daemon stop       # stops the daemon and all managed services
+gpm daemon start      # start it back up
 ```
 
 ## Commands
 
+Every targeting command accepts either the integer **id** (from `gpm list`) or
+the service **name**.
+
 | Command | Description |
 |---|---|
-| `gpm daemon start` | Start the background daemon |
-| `gpm daemon stop` | Stop the daemon (also stops all processes) |
-| `gpm daemon status` | Check if the daemon is running |
 | `gpm start <binary> [name]` | Start a process (see Start Options for cluster/reload flags) |
-| `gpm stop <name>` | Stop a process gracefully (SIGTERM → SIGKILL) |
-| `gpm restart <name>` | Hard restart (with downtime) |
-| `gpm reload <name>` | **Zero-downtime** rolling reload |
-| `gpm scale <name> <n>` | Change the number of running instances |
-| `gpm delete <name>` | Stop and remove a process |
-| `gpm list` (or `ps`) | List all processes with instances/status/mode/port |
-| `gpm logs <name>` | Show last 50 lines of stdout+stderr |
-| `gpm logs <name> -f` | Follow logs live |
-| `gpm logs <name> -n 100` | Show last N lines |
+| `gpm stop <id\|name>` | Stop a process gracefully (SIGTERM → SIGKILL) |
+| `gpm restart <id\|name>` | Hard restart (with downtime) |
+| `gpm reload <id\|name>` | **Zero-downtime** rolling reload |
+| `gpm scale <id\|name> <n>` | Change the number of running instances |
+| `gpm delete <id\|name>` | Stop and remove a process |
+| `gpm list` (or `ps`) | List all processes with id/instances/status/mode/port |
+| `gpm logs <id\|name>` | Show last 50 lines of stdout+stderr |
+| `gpm logs <id\|name> -f` | Follow logs live |
+| `gpm logs <id\|name> -n 100` | Show last N lines |
 | `gpm save` | Save current process list |
 | `gpm resurrect` | Restore previously saved processes |
+| `gpm version` | Print the installed version |
+| `gpm update [--check]` | Self-update to the latest release |
+| `gpm daemon start\|stop\|status` | Manually control the daemon (auto-starts otherwise) |
 
 ## Start Options
 
@@ -194,11 +215,12 @@ All state lives under `~/.gpm/`:
 
 ## Auto-restart on system boot
 
-Add to your `/etc/rc.local` or a systemd unit:
+Run `gpm resurrect` at boot — it auto-starts the daemon and relaunches your
+saved services (run `gpm save` once after setting them up):
 
 ```bash
 # rc.local style
-su - youruser -c "gpm daemon start && gpm resurrect"
+su - youruser -c "gpm resurrect"
 ```
 
 Or as a systemd unit (`/etc/systemd/system/gpm.service`):

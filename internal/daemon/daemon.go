@@ -13,11 +13,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/parichit/gpm/internal/health"
-	"github.com/parichit/gpm/internal/ipc"
-	"github.com/parichit/gpm/internal/process"
-	"github.com/parichit/gpm/internal/proxy"
-	"github.com/parichit/gpm/internal/state"
+	"github.com/parichit13/gpm/internal/health"
+	"github.com/parichit13/gpm/internal/ipc"
+	"github.com/parichit13/gpm/internal/process"
+	"github.com/parichit13/gpm/internal/proxy"
+	"github.com/parichit13/gpm/internal/state"
 )
 
 type Daemon struct {
@@ -95,6 +95,15 @@ func (d *Daemon) handle(conn net.Conn) {
 	if err := json.NewDecoder(conn).Decode(&req); err != nil {
 		respond(conn, ipc.Response{OK: false, Error: err.Error()})
 		return
+	}
+
+	// Normalize an integer ID to the canonical service name for commands that
+	// target an existing service, so every command works with either handle.
+	switch req.Action {
+	case ipc.ActionStop, ipc.ActionRestart, ipc.ActionReload, ipc.ActionScale, ipc.ActionDelete, ipc.ActionLogs:
+		if p, ok := d.store.Resolve(req.Name); ok {
+			req.Name = p.Name
+		}
 	}
 
 	var resp ipc.Response
@@ -176,9 +185,10 @@ func (d *Daemon) cmdStart(req ipc.Request) ipc.Response {
 	}
 
 	p := buildServiceSpec(req)
+	p.ID = d.store.NextFreeID()
 	d.store.Set(p)
 	d.startInstancesLocked(p)
-	return ipc.Response{OK: true, Data: fmt.Sprintf("started '%s' (%d instance(s), mode=%s)", req.Name, p.InstanceCount(), p.Mode)}
+	return ipc.Response{OK: true, Data: fmt.Sprintf("started '%s' (id %d, %d instance(s), mode=%s)", req.Name, p.ID, p.InstanceCount(), p.Mode)}
 }
 
 // checkExecutable verifies the binary exists, is a regular file, and is
@@ -715,6 +725,7 @@ func (d *Daemon) cmdScale(req ipc.Request) ipc.Response {
 // ─── list / logs ────────────────────────────────────────────────────────────
 
 type ProcessInfo struct {
+	ID        int    `json:"id"`
 	Name      string `json:"name"`
 	PID       int    `json:"pid"`
 	Status    string `json:"status"`
@@ -757,6 +768,7 @@ func (d *Daemon) cmdList() ipc.Response {
 			uptime = formatUptime(earliest)
 		}
 		infos = append(infos, ProcessInfo{
+			ID:        p.ID,
 			Name:      p.Name,
 			PID:       pid,
 			Status:    status,
@@ -771,6 +783,7 @@ func (d *Daemon) cmdList() ipc.Response {
 			Watch:     p.Watch,
 		})
 	}
+	sort.Slice(infos, func(i, j int) bool { return infos[i].ID < infos[j].ID })
 	return ipc.Response{OK: true, Data: infos}
 }
 

@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/parichit/gpm/cmd"
-	"github.com/parichit/gpm/internal/daemon"
+	"github.com/parichit13/gpm/cmd"
+	"github.com/parichit13/gpm/internal/daemon"
 )
 
 func main() {

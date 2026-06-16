@@ -1,4 +1,4 @@
-module github.com/parichit/gpm
+module github.com/parichit13/gpm
 
 go 1.25.0
 

@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/parichit/gpm/internal/state"
+	"github.com/parichit13/gpm/internal/state"
 )
 
 const (

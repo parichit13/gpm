@@ -17,7 +17,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/parichit/gpm/internal/ipc"
+	"github.com/parichit13/gpm/internal/ipc"
 )
 
 var (
@@ -48,11 +48,14 @@ var rootCmd = &cobra.Command{
 }
 
 func Execute() error {
+	rootCmd.Version = Version // enables `gpm --version`
 	return rootCmd.Execute()
 }
 
 func init() {
-	rootCmd.AddCommand(startCmd, stopCmd, restartCmd, reloadCmd, scaleCmd, deleteCmd, listCmd, logsCmd, saveCmd, resurrectCmd, daemonCmd, statusCmd)
+	rootCmd.AddCommand(startCmd, stopCmd, restartCmd, reloadCmd, scaleCmd, deleteCmd, listCmd, logsCmd, saveCmd, resurrectCmd, daemonCmd, statusCmd, versionCmd, updateCmd)
+	updateCmd.Flags().BoolVar(&flagUpdateCheck, "check", false, "Only check whether an update is available; don't install")
+	updateCmd.Flags().BoolVar(&flagUpdateForce, "force", false, "Reinstall the latest release even if already up to date")
 }
 
 // ─── start ────────────────────────────────────────────────────────────────────
@@ -109,7 +112,7 @@ var startCmd = &cobra.Command{
 // ─── stop ─────────────────────────────────────────────────────────────────────
 
 var stopCmd = &cobra.Command{
-	Use:   "stop <name>",
+	Use:   "stop <id|name>",
 	Short: "Stop a running process",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -121,7 +124,7 @@ var stopCmd = &cobra.Command{
 // ─── restart ──────────────────────────────────────────────────────────────────
 
 var restartCmd = &cobra.Command{
-	Use:   "restart <name>",
+	Use:   "restart <id|name>",
 	Short: "Restart a process",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -133,7 +136,7 @@ var restartCmd = &cobra.Command{
 // ─── reload (zero-downtime) ─────────────────────────────────────────────────
 
 var reloadCmd = &cobra.Command{
-	Use:   "reload <name>",
+	Use:   "reload <id|name>",
 	Short: "Zero-downtime reload (rolling, one instance at a time)",
 	Long: "Reload a service with no dropped connections: for each instance, start a\n" +
 		"replacement, wait for it to pass its health check, then drain the old one.\n" +
@@ -153,7 +156,7 @@ var reloadCmd = &cobra.Command{
 // ─── scale ────────────────────────────────────────────────────────────────────
 
 var scaleCmd = &cobra.Command{
-	Use:   "scale <name> <n>",
+	Use:   "scale <id|name> <n>",
 	Short: "Change the number of running instances",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -169,7 +172,7 @@ var scaleCmd = &cobra.Command{
 // ─── delete ───────────────────────────────────────────────────────────────────
 
 var deleteCmd = &cobra.Command{
-	Use:     "delete <name>",
+	Use:     "delete <id|name>",
 	Aliases: []string{"del", "rm"},
 	Short:   "Stop and remove a process",
 	Args:    cobra.ExactArgs(1),
@@ -182,6 +185,7 @@ var deleteCmd = &cobra.Command{
 // ─── list ─────────────────────────────────────────────────────────────────────
 
 type ProcessInfo struct {
+	ID        int    `json:"id"`
 	Name      string `json:"name"`
 	PID       int    `json:"pid"`
 	Status    string `json:"status"`
@@ -230,7 +234,7 @@ var listCmd = &cobra.Command{
 			}
 		}
 
-		headers := []string{"NAME", "INSTANCES", "STATUS", "MODE", "PORT", "RESTARTS", "UPTIME"}
+		headers := []string{"ID", "NAME", "INSTANCES", "STATUS", "MODE", "PORT", "RESTARTS", "UPTIME"}
 		if showWatch {
 			headers = append(headers, "WATCH")
 		}
@@ -256,6 +260,7 @@ var listCmd = &cobra.Command{
 			// elevated if a drain is stuck, which the draining note explains.
 			live := p.Healthy + p.Draining
 			row := []string{
+				strconv.Itoa(p.ID),
 				p.Name,
 				fmt.Sprintf("%d/%d", live, p.Instances),
 				status, // colored at render time; kept plain here for width
@@ -274,7 +279,7 @@ var listCmd = &cobra.Command{
 			row = append(row, p.Binary)
 			rows = append(rows, row)
 		}
-		printTable(os.Stdout, headers, rows, 2 /* STATUS column */)
+		printTable(os.Stdout, headers, rows, 3 /* STATUS column */)
 		return nil
 	},
 }
@@ -354,7 +359,7 @@ var statusCmd = &cobra.Command{
 // ─── logs ─────────────────────────────────────────────────────────────────────
 
 var logsCmd = &cobra.Command{
-	Use:   "logs <name>",
+	Use:   "logs <id|name>",
 	Short: "Show process logs",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -477,6 +482,10 @@ var daemonCmd = &cobra.Command{
 }
 
 func init() {
+	// Any command that talks to the daemon will auto-start it if it's not
+	// running (covers post-install and post-reboot).
+	ipc.EnsureDaemon = ensureDaemonRunning
+
 	daemonCmd.AddCommand(daemonStartCmd, daemonStopCmd, daemonStatusCmd)
 
 	startCmd.Flags().StringArrayVarP(&flagArgs, "args", "a", nil, "Arguments to pass to the process")
@@ -500,70 +509,92 @@ var daemonStartCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start the gpm daemon in the background",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Check if already running
-		resp, err := ipc.Send(ipc.Request{Action: ipc.ActionPing})
-		if err == nil && resp.OK {
+		if ipc.PingRaw() {
 			fmt.Println("gpm daemon is already running.")
 			return nil
 		}
-
-		// Self-re-exec with __DAEMON_MODE flag
-		exe, err := os.Executable()
+		pid, err := startDaemonProcess()
 		if err != nil {
 			return err
 		}
-
-		if err := os.MkdirAll(gpmDir(), 0755); err != nil {
-			return err
-		}
-		logPath := filepath.Join(gpmDir(), "daemon.log")
-		logF, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-		if err != nil {
-			return err
-		}
-
-		c := exec.Command(exe, "__daemon_run")
-		c.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-		c.Stdout = logF
-		c.Stderr = logF
-		if err := c.Start(); err != nil {
-			return fmt.Errorf("failed to start daemon: %w", err)
-		}
-
-		// Wait briefly and ping
-		time.Sleep(300 * time.Millisecond)
-		for i := 0; i < 10; i++ {
-			r, e := ipc.Send(ipc.Request{Action: ipc.ActionPing})
-			if e == nil && r.OK {
-				fmt.Printf("gpm daemon started (pid=%d)\n", c.Process.Pid)
-				return nil
-			}
-			time.Sleep(200 * time.Millisecond)
-		}
-		fmt.Printf("gpm daemon started (pid=%d) — check %s if issues\n", c.Process.Pid, logPath)
+		fmt.Printf("gpm daemon started (pid=%d)\n", pid)
 		return nil
 	},
+}
+
+// startDaemonProcess spawns the daemon in the background (self-re-exec into
+// __daemon_run, detached, logs to ~/.gpm/daemon.log) and waits until it answers
+// pings. Shared by `gpm daemon start` and the auto-start path.
+func startDaemonProcess() (int, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return 0, err
+	}
+	if err := os.MkdirAll(gpmDir(), 0755); err != nil {
+		return 0, err
+	}
+	logPath := filepath.Join(gpmDir(), "daemon.log")
+	logF, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return 0, err
+	}
+
+	c := exec.Command(exe, "__daemon_run")
+	c.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	c.Stdout = logF
+	c.Stderr = logF
+	if err := c.Start(); err != nil {
+		return 0, fmt.Errorf("failed to start daemon: %w", err)
+	}
+
+	time.Sleep(200 * time.Millisecond)
+	for i := 0; i < 25; i++ {
+		if ipc.PingRaw() {
+			return c.Process.Pid, nil
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	return c.Process.Pid, fmt.Errorf("daemon started (pid=%d) but did not become ready — check %s", c.Process.Pid, logPath)
+}
+
+// ensureDaemonRunning is the auto-start hook the ipc client calls when it can't
+// reach the daemon. It's a no-op if the daemon is already up.
+func ensureDaemonRunning() error {
+	if ipc.PingRaw() {
+		return nil
+	}
+	_, err := startDaemonProcess()
+	return err
+}
+
+// stopDaemon signals the running daemon to stop (graceful: it stops all
+// services, then exits). Shared by `gpm daemon stop` and self-update.
+func stopDaemon() error {
+	pidFile := filepath.Join(gpmDir(), "daemon.pid")
+	data, err := os.ReadFile(pidFile)
+	if err != nil {
+		return fmt.Errorf("daemon not running (no pid file)")
+	}
+	var pid int
+	fmt.Sscan(string(data), &pid)
+	p, err := os.FindProcess(pid)
+	if err != nil {
+		return fmt.Errorf("process not found")
+	}
+	if err := p.Signal(os.Interrupt); err != nil {
+		return err
+	}
+	os.Remove(pidFile)
+	return nil
 }
 
 var daemonStopCmd = &cobra.Command{
 	Use:   "stop",
 	Short: "Stop the gpm daemon",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		pidFile := filepath.Join(gpmDir(), "daemon.pid")
-		data, err := os.ReadFile(pidFile)
-		if err != nil {
-			return fmt.Errorf("daemon not running (no pid file)")
-		}
-		var pid int
-		fmt.Sscan(string(data), &pid)
-		p, err := os.FindProcess(pid)
-		if err != nil {
-			return fmt.Errorf("process not found")
-		}
-		if err := p.Signal(os.Interrupt); err != nil {
+		if err := stopDaemon(); err != nil {
 			return err
 		}
-		os.Remove(pidFile)
 		fmt.Println("gpm daemon stopped.")
 		return nil
 	},
@@ -573,13 +604,11 @@ var daemonStatusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Check if the daemon is running",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		resp, err := ipc.Send(ipc.Request{Action: ipc.ActionPing})
-		if err != nil {
-			fmt.Println("gpm daemon: NOT running")
-			return nil
-		}
-		if resp.OK {
+		// PingRaw doesn't auto-start, so status reports the truth.
+		if ipc.PingRaw() {
 			fmt.Println("gpm daemon: running")
+		} else {
+			fmt.Println("gpm daemon: NOT running")
 		}
 		return nil
 	},

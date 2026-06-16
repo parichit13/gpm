@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -46,6 +47,7 @@ type InstanceState struct {
 }
 
 type Process struct {
+	ID       int               `json:"id"` // stable integer handle, usable in place of the name
 	Name     string            `json:"name"`
 	Binary   string            `json:"binary"`
 	Args     []string          `json:"args"`
@@ -187,6 +189,39 @@ func (s *Store) Get(name string) (*Process, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	p, ok := s.processes[name]
+	return p, ok
+}
+
+// NextFreeID returns the lowest non-negative integer not currently used as a
+// service ID, so IDs stay small and gaps from deletions get reused (PM2-style).
+func (s *Store) NextFreeID() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	used := make(map[int]bool, len(s.processes))
+	for _, p := range s.processes {
+		used[p.ID] = true
+	}
+	for id := 0; ; id++ {
+		if !used[id] {
+			return id
+		}
+	}
+}
+
+// Resolve looks a process up by integer ID (if idOrName is all digits) or by
+// name, returning the canonical name so callers can proceed uniformly.
+func (s *Store) Resolve(idOrName string) (*Process, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if id, err := strconv.Atoi(idOrName); err == nil {
+		for _, p := range s.processes {
+			if p.ID == id {
+				return p, true
+			}
+		}
+		return nil, false
+	}
+	p, ok := s.processes[idOrName]
 	return p, ok
 }
 

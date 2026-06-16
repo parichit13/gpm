@@ -18,7 +18,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/parichit/gpm/pkg/gpm"
+	"github.com/parichit13/gpm/pkg/gpm"
 )
 
 // Version is overridable at build time via -ldflags "-X main.Version=...".
