@@ -3,6 +3,8 @@
 A lightweight, PM2-inspired process manager for Go (and any) binaries.  
 No Node.js required. No source compilation. Just point it at a binary.
 
+**Website:** https://parichit13.github.io/gpm/
+
 ## Features
 
 - **Start, stop, restart, delete** processes by name

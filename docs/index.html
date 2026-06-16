@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gpm — Zero-downtime process manager for Go services</title>
+<meta name="description" content="gpm is a PM2-style process manager with true zero-downtime reloads, cluster mode, watch mode, and a built-in proxy for opaque binaries. No Node.js. One binary.">
+<meta property="og:title" content="gpm — Zero-downtime process manager for Go services">
+<meta property="og:description" content="PM2-style process manager with true zero-downtime reloads for Go services. No Node.js. One binary.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b1020; --bg2:#0e1530; --panel:#121a35; --panel2:#0d1330;
+    --panel-border:#22305c; --text:#e7ecf6; --muted:#9aa7c7; --dim:#6b779b;
+    --accent:#22d3ee; --accent2:#34d399; --accent3:#7c9cff; --warn:#fbbf24;
+    --red:#fb7185; --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+    --sans:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;font-family:var(--sans);color:var(--text);background:var(--bg);
+    line-height:1.6;-webkit-font-smoothing:antialiased;
+    background:
+      radial-gradient(900px 600px at 80% -10%, rgba(34,211,238,.12), transparent 60%),
+      radial-gradient(800px 500px at 0% 0%, rgba(124,156,255,.10), transparent 55%),
+      var(--bg);
+  }
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+  .mono{font-family:var(--mono)}
+
+  /* nav */
+  header.nav{position:sticky;top:0;z-index:20;backdrop-filter:blur(10px);
+    background:rgba(11,16,32,.7);border-bottom:1px solid var(--panel-border)}
+  .nav .wrap{display:flex;align-items:center;justify-content:space-between;height:62px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px;letter-spacing:-.02em}
+  .brand .logo{font-family:var(--mono);background:linear-gradient(135deg,var(--accent),var(--accent3));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .nav nav{display:flex;gap:26px;align-items:center}
+  .nav nav a{color:var(--muted);font-size:14px;font-weight:500}
+  .nav nav a:hover{color:var(--text);text-decoration:none}
+  .gh{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--panel-border);
+    padding:8px 14px;border-radius:9px;color:var(--text);font-size:14px;font-weight:600}
+  .gh:hover{border-color:var(--accent);text-decoration:none}
+  @media(max-width:720px){.nav nav a.hideable{display:none}}
+
+  /* hero */
+  .hero{padding:88px 0 56px;text-align:center}
+  .badge{display:inline-block;font-family:var(--mono);font-size:12.5px;color:var(--accent);
+    border:1px solid var(--panel-border);background:rgba(34,211,238,.06);
+    padding:6px 12px;border-radius:999px;margin-bottom:26px}
+  h1{font-size:clamp(38px,6vw,68px);line-height:1.04;letter-spacing:-.03em;margin:0 0 18px;font-weight:800}
+  h1 .grad{background:linear-gradient(120deg,var(--accent),var(--accent2) 60%,var(--accent3));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{font-size:clamp(17px,2.4vw,21px);color:var(--muted);max-width:680px;margin:0 auto 34px}
+  .cta{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-bottom:30px}
+  .btn{display:inline-flex;align-items:center;gap:9px;padding:13px 22px;border-radius:11px;
+    font-weight:600;font-size:15px;border:1px solid transparent;cursor:pointer}
+  .btn.primary{background:linear-gradient(120deg,var(--accent),var(--accent3));color:#06121f}
+  .btn.primary:hover{filter:brightness(1.08);text-decoration:none}
+  .btn.ghost{border-color:var(--panel-border);color:var(--text);background:var(--panel)}
+  .btn.ghost:hover{border-color:var(--accent);text-decoration:none}
+
+  /* install command */
+  .install{max-width:660px;margin:0 auto}
+  .install .label{font-size:12.5px;color:var(--dim);margin-bottom:8px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em}
+  .cmd{display:flex;align-items:center;gap:12px;background:#080d1c;border:1px solid var(--panel-border);
+    border-radius:12px;padding:14px 16px;font-family:var(--mono);font-size:14.5px;text-align:left}
+  .cmd .prompt{color:var(--accent2)}
+  .cmd code{flex:1;color:var(--text);overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+  .cmd code::-webkit-scrollbar{display:none}
+  .copy{border:1px solid var(--panel-border);background:var(--panel);color:var(--muted);
+    border-radius:8px;padding:7px 11px;font-size:12.5px;cursor:pointer;font-family:var(--sans);white-space:nowrap}
+  .copy:hover{color:var(--text);border-color:var(--accent)}
+  .copy.ok{color:var(--accent2);border-color:var(--accent2)}
+  .hint{font-size:13px;color:var(--dim);margin-top:12px}
+
+  /* sections */
+  section{padding:64px 0;border-top:1px solid rgba(34,48,92,.5)}
+  .eyebrow{font-family:var(--mono);font-size:13px;color:var(--accent);letter-spacing:.05em;margin:0 0 10px}
+  h2{font-size:clamp(26px,3.6vw,38px);letter-spacing:-.02em;margin:0 0 14px;font-weight:800}
+  .lead{color:var(--muted);font-size:17px;max-width:660px;margin:0 0 36px}
+
+  /* feature grid */
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  @media(max-width:880px){.grid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:560px){.grid{grid-template-columns:1fr}}
+  .card{background:linear-gradient(180deg,var(--panel),rgba(13,19,40,.6));border:1px solid var(--panel-border);
+    border-radius:14px;padding:22px;transition:transform .15s,border-color .15s}
+  .card:hover{transform:translateY(-3px);border-color:var(--accent)}
+  .card .ic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;margin-bottom:14px;
+    background:rgba(34,211,238,.1);font-size:20px}
+  .card h3{margin:0 0 8px;font-size:17px;font-weight:700}
+  .card p{margin:0;color:var(--muted);font-size:14.5px}
+
+  /* terminal */
+  .term{background:#080d1c;border:1px solid var(--panel-border);border-radius:14px;overflow:hidden;
+    box-shadow:0 30px 80px -40px rgba(0,0,0,.8)}
+  .term .bar{display:flex;align-items:center;gap:8px;padding:12px 16px;background:#0c1330;
+    border-bottom:1px solid var(--panel-border)}
+  .term .bar .dot{width:12px;height:12px;border-radius:50%}
+  .dot.r{background:#ff5f57}.dot.y{background:#febc2e}.dot.g{background:#28c840}
+  .term .bar .ttl{margin-left:10px;font-family:var(--mono);font-size:12.5px;color:var(--dim)}
+  .term pre{margin:0;padding:20px;font-family:var(--mono);font-size:13.5px;line-height:1.7;
+    overflow-x:auto;color:#cdd6f4}
+  .term .c-prompt{color:var(--accent2)}
+  .term .c-flag{color:var(--accent3)}
+  .term .c-comment{color:var(--dim)}
+  .term .c-ok{color:var(--accent2)}
+  .term .c-reload{color:#c084fc}
+  .term .c-dim{color:var(--dim)}
+  .term .c-head{color:var(--muted)}
+
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  @media(max-width:820px){.two{grid-template-columns:1fr}}
+  .mode{background:var(--panel);border:1px solid var(--panel-border);border-radius:14px;padding:24px}
+  .mode h3{margin:0 0 6px;font-size:19px;display:flex;align-items:center;gap:10px}
+  .mode .tag{font-family:var(--mono);font-size:11px;padding:3px 8px;border-radius:6px;
+    background:rgba(34,211,238,.1);color:var(--accent)}
+  .mode .tag.alt{background:rgba(52,211,153,.1);color:var(--accent2)}
+  .mode p{color:var(--muted);font-size:14.5px}
+  .mode ul{margin:14px 0 0;padding-left:18px;color:var(--muted);font-size:14px}
+  .mode li{margin:6px 0}
+
+  .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  @media(max-width:820px){.steps{grid-template-columns:1fr 1fr}}
+  @media(max-width:480px){.steps{grid-template-columns:1fr}}
+  .step{position:relative;padding:18px;border:1px solid var(--panel-border);border-radius:12px;background:var(--panel)}
+  .step .n{font-family:var(--mono);font-size:12px;color:var(--accent);margin-bottom:8px}
+  .step code{font-family:var(--mono);font-size:13px;color:var(--text);display:block;margin-bottom:8px}
+  .step p{margin:0;color:var(--muted);font-size:13.5px}
+
+  footer{padding:48px 0 64px;border-top:1px solid rgba(34,48,92,.5);text-align:center;color:var(--dim);font-size:14px}
+  footer a{color:var(--muted)}
+  .footnote{font-size:12.5px;color:var(--dim);margin-top:10px}
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap">
+    <div class="brand"><span class="logo">gpm</span></div>
+    <nav>
+      <a class="hideable" href="#features">Features</a>
+      <a class="hideable" href="#modes">How it works</a>
+      <a class="hideable" href="#start">Quick start</a>
+      <a class="gh" href="https://github.com/parichit13/gpm" target="_blank" rel="noopener">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        GitHub
+      </a>
+    </nav>
+  </div>
+</header>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="wrap">
+    <span class="badge">PM2, but for Go services — with real zero-downtime</span>
+    <h1>Ship new versions with<br><span class="grad">zero dropped connections</span></h1>
+    <p class="sub">gpm is a single-binary process manager that gives your Go services true
+      zero-downtime reloads, cluster mode, and auto-reload-on-rebuild — no Node.js, no config files.</p>
+    <div class="cta">
+      <a class="btn primary" href="#start">Get started →</a>
+      <a class="btn ghost" href="https://github.com/parichit13/gpm" target="_blank" rel="noopener">View on GitHub</a>
+    </div>
+    <div class="install">
+      <div class="label">Install (macOS / Linux)</div>
+      <div class="cmd">
+        <span class="prompt">$</span>
+        <code id="installcmd">curl -fsSL https://raw.githubusercontent.com/parichit13/gpm/main/install.sh | bash</code>
+        <button class="copy" id="copybtn">Copy</button>
+      </div>
+      <p class="hint">Downloads the right binary, verifies its checksum, installs to <span class="mono">~/.gpm/bin</span>, and starts the daemon. Update anytime with <span class="mono">gpm update</span>.</p>
+    </div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="wrap">
+    <p class="eyebrow">// what you get</p>
+    <h2>Built for production, not just <span class="mono">&amp;</span></h2>
+    <p class="lead">Everything you'd reach for to keep a service available through deploys, crashes, and reboots.</p>
+    <div class="grid">
+      <div class="card"><div class="ic">♻️</div><h3>Zero-downtime reload</h3><p>Rolling, health-gated reloads. A new instance must pass its health check before the old one drains its in-flight requests — the port is never down.</p></div>
+      <div class="card"><div class="ic">⛓️</div><h3>Cluster mode</h3><p>Run N instances behind one port with <span class="mono">-i N</span>, and <span class="mono">scale</span> up or down live without dropping traffic.</p></div>
+      <div class="card"><div class="ic">👁️</div><h3>Watch mode</h3><p>Pass <span class="mono">--watch</span> and gpm auto-runs a zero-downtime reload whenever the binary changes. Just rebuild — traffic rolls over on its own.</p></div>
+      <div class="card"><div class="ic">🔌</div><h3>Any binary</h3><p>Use the tiny Go SDK (<span class="mono">SO_REUSEPORT</span>) for services you control, or the built-in TCP proxy for opaque binaries you can't change.</p></div>
+      <div class="card"><div class="ic">🛟</div><h3>Crash-loop safe</h3><p>Auto-restart with exponential backoff, an honest <span class="mono">errored</span> state, and exit-reason logging — so a flapping binary never hides as "stopped".</p></div>
+      <div class="card"><div class="ic">💾</div><h3>Save &amp; resurrect</h3><p><span class="mono">gpm save</span> then <span class="mono">gpm resurrect</span> brings your whole process list back — instances, ports, modes, health and all — after a reboot.</p></div>
+      <div class="card"><div class="ic">⬆️</div><h3>Self-updating</h3><p><span class="mono">gpm update</span> fetches the latest release, verifies the checksum, swaps the binary in place, and restarts the daemon.</p></div>
+      <div class="card"><div class="ic">⚡</div><h3>Zero-config daemon</h3><p>The background daemon starts automatically on first use and after reboot. Services get stable integer ids you can use in any command.</p></div>
+      <div class="card"><div class="ic">🪶</div><h3>One static binary</h3><p>No Node.js, no runtime, no config files. A single Go binary and a Unix socket. Works on macOS and Linux, amd64 and arm64.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- TERMINAL DEMO -->
+<section id="demo">
+  <div class="wrap">
+    <p class="eyebrow">// gpm list, mid-reload</p>
+    <h2>Watch a reload happen, live</h2>
+    <p class="lead">During a reload the new instance comes up alongside the old one. The <span class="mono">INSTANCES</span> count even reconciles with <span class="mono">ps</span> — extra live processes show while the old one drains.</p>
+    <div class="term">
+      <div class="bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="ttl">gpm — zsh</span></div>
+      <pre id="termbody"></pre>
+    </div>
+  </div>
+</section>
+
+<!-- MODES -->
+<section id="modes">
+  <div class="wrap">
+    <p class="eyebrow">// how it works</p>
+    <h2>Two ways to share the port</h2>
+    <p class="lead">Zero-downtime means old and new instances both serve during the swap. gpm does that two ways, depending on whether you can modify the service.</p>
+    <div class="two">
+      <div class="mode">
+        <h3>reuseport <span class="tag">default · SDK</span></h3>
+        <p>For Go services you control. Import the ~3-line SDK; instances bind the same port with <span class="mono">SO_REUSEPORT</span> and the kernel load-balances. gpm probes a per-instance health endpoint to confirm the new one before draining the old.</p>
+        <ul>
+          <li><span class="mono">ln, _ := gpm.Listen(":8080")</span></li>
+          <li><span class="mono">gpm.Serve(srv, ln)</span> — graceful SIGTERM drain</li>
+          <li>No extra hop — traffic goes straight to your service</li>
+        </ul>
+      </div>
+      <div class="mode">
+        <h3>proxy <span class="tag alt">opaque binaries</span></h3>
+        <p>For binaries you can't change. gpm owns the public port and runs a built-in TCP load balancer, starting each instance on a private port it reads from <span class="mono">$PORT</span>. On reload it swaps upstreams atomically — retrying past a draining backend.</p>
+        <ul>
+          <li>No code changes — just reads <span class="mono">$PORT</span></li>
+          <li>Even round-robin across instances</li>
+          <li>Readiness gates traffic to a new instance</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- QUICK START -->
+<section id="start">
+  <div class="wrap">
+    <p class="eyebrow">// quick start</p>
+    <h2>From install to zero-downtime in four steps</h2>
+    <p class="lead">The daemon auto-starts, so there's nothing to configure. Every command takes an id or a name.</p>
+    <div class="steps">
+      <div class="step"><div class="n">01</div><code>gpm start ./api api \<br>&nbsp;&nbsp;--port 8080 -i 3 --watch</code><p>Run 3 instances behind port 8080, watching the binary.</p></div>
+      <div class="step"><div class="n">02</div><code>gpm list</code><p>See ids, status, instance counts, mode, port and uptime.</p></div>
+      <div class="step"><div class="n">03</div><code>gpm reload api<br><span style="color:var(--dim)"># or just rebuild</span></code><p>Zero-downtime rollover. With <span class="mono">--watch</span>, a rebuild triggers it automatically.</p></div>
+      <div class="step"><div class="n">04</div><code>gpm save</code><p>Persist the list so <span class="mono">gpm resurrect</span> restores it after a reboot.</p></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div><span class="mono" style="font-weight:700;font-size:16px;color:var(--text)">gpm</span> — zero-downtime process manager for Go services</div>
+    <p style="margin:14px 0 0">
+      <a href="https://github.com/parichit13/gpm" target="_blank" rel="noopener">GitHub</a> ·
+      <a href="https://github.com/parichit13/gpm#readme" target="_blank" rel="noopener">Docs</a> ·
+      <a href="https://github.com/parichit13/gpm/tree/main/pkg/gpm" target="_blank" rel="noopener">SDK</a> ·
+      <a href="https://github.com/parichit13/gpm/tree/main/examples" target="_blank" rel="noopener">Examples</a>
+    </p>
+    <p class="footnote">MIT licensed · Built in Go · macOS &amp; Linux (amd64 / arm64)</p>
+  </div>
+</footer>
+
+<script>
+  // Copy install command
+  (function(){
+    var btn=document.getElementById('copybtn'),
+        cmd=document.getElementById('installcmd');
+    btn.addEventListener('click',function(){
+      navigator.clipboard.writeText(cmd.textContent.trim()).then(function(){
+        btn.textContent='Copied!';btn.classList.add('ok');
+        setTimeout(function(){btn.textContent='Copy';btn.classList.remove('ok');},1600);
+      });
+    });
+  })();
+
+  // Animated `gpm list` reload demo
+  (function(){
+    var el=document.getElementById('termbody');
+    if(!el) return;
+    var head =
+      '<span class="c-prompt">$</span> gpm reload <span class="c-flag">api</span>\n' +
+      '<span class="c-dim">reload started for \'api\' — new instances coming up, old ones draining in the background</span>\n\n' +
+      '<span class="c-head">ID  NAME  INSTANCES  STATUS                  MODE       PORT  UPTIME</span>\n';
+    // frames: [instances, statusHTML]
+    var frames=[
+      ['3/3','<span class="c-ok">running</span>'],
+      ['4/3','<span class="c-reload">reloading (1 draining)</span>'],
+      ['5/3','<span class="c-reload">reloading (2 draining)</span>'],
+      ['4/3','<span class="c-reload">reloading (1 draining)</span>'],
+      ['3/3','<span class="c-ok">running</span>']
+    ];
+    var versions=['v1','v1','v2','v2','v2'];
+    var i=0;
+    function pad(s,n){s=String(s);while(s.length<n)s+=' ';return s;}
+    function render(){
+      var f=frames[i], inst=f[0], status=f[1];
+      // strip tags for width calc
+      var plain=status.replace(/<[^>]+>/g,'');
+      var statusCell=status+' '.repeat(Math.max(0,22-plain.length));
+      var row='0   api   '+pad(inst,9)+'  '+statusCell+'  reuseport  8080  '+
+              (i===0?'3m':(i===4?'2s':'4s'))+'   <span class="c-dim">// '+versions[i]+'</span>';
+      el.innerHTML=head+row;
+      i=(i+1)%frames.length;
+    }
+    render();
+    setInterval(render,1400);
+  })();
+</script>
+</body>
+</html>
