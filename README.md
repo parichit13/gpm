@@ -111,8 +111,12 @@ gpm version           # show the installed version
 ```bash
 git clone https://github.com/parichit13/gpm
 cd gpm
-make install          # builds and installs to /usr/local/bin
+make install          # builds and installs to ~/.gpm/bin (no sudo)
 ```
+
+`make install` targets the same `~/.gpm/bin` the curl installer uses, so there's
+never a second copy to keep in sync. Override with
+`make install INSTALL_DIR=/some/bin` if needed.
 
 ## Quick Start
 

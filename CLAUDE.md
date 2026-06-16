@@ -19,7 +19,7 @@ go vet ./...
 go test ./... -count=1     # only internal/proxy and internal/health have tests
 go test ./internal/proxy/ -run TestProxyRetriesPastDeadUpstream -count=1   # a single test
 make release               # cross-compile dist/gpm_<os>_<arch> for darwin/linux × amd64/arm64
-sudo make install          # build + install to /usr/local/bin (see "macOS code-signing" gotcha)
+make install               # build + install to ~/.gpm/bin, no sudo (override: INSTALL_DIR=...)
 ```
 
 `examples/gin-server` is a **separate Go module** (it pulls in Gin, kept out of the SDK's deps via a
