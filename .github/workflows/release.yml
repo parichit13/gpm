@@ -31,3 +31,6 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # PAT with write access to parichit13/homebrew-tap (repo scope).
+          # Create the secret in repo Settings → Secrets and variables → Actions.
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}

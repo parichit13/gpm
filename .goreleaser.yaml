@@ -1,5 +1,9 @@
-# GoReleaser v2 — builds cross-platform binaries and publishes a GitHub Release.
-# Triggered by CI on a pushed `v*` tag. Validate locally with: goreleaser check
+# GoReleaser v2 — builds cross-platform binaries, publishes a GitHub Release,
+# and updates the Homebrew tap. Triggered by CI on a pushed `v*` tag.
+# Validate locally with: goreleaser check
+#
+# This branch (homebrew-support) adds the Homebrew tap channel on top of main.
+# See HOMEBREW.md for how to finish setup and merge it into main.
 version: 2
 
 project_name: gpm
@@ -43,9 +47,22 @@ release:
   draft: false
   prerelease: auto
 
-# NOTE: A Homebrew tap channel lives on the `homebrew-support` branch (see
-# HOMEBREW.md there). The curl install script + `gpm update` are the default
-# install/update path and don't depend on it.
+brews:
+  - name: gpm
+    repository:
+      owner: parichit13
+      name: homebrew-tap
+      branch: main
+      # A PAT with write access to the tap repo (set as a CI secret).
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: "https://github.com/parichit13/gpm"
+    description: "Zero-downtime process manager for Go services"
+    license: "MIT"
+    # We ship raw binaries, so install whatever single binary was downloaded.
+    install: |
+      bin.install Dir["gpm*"].first => "gpm"
+    test: |
+      system "#{bin}/gpm", "version"
 
 changelog:
   sort: asc

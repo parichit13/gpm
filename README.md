@@ -96,6 +96,12 @@ starts the daemon:
 curl -fsSL https://raw.githubusercontent.com/parichit13/gpm/main/install.sh | bash
 ```
 
+**Homebrew**:
+
+```bash
+brew install parichit13/tap/gpm
+```
+
 **Updating** — check for and install new versions:
 
 ```bash
@@ -103,6 +109,8 @@ gpm update --check    # report whether a newer version is available
 gpm update            # download + install the latest, then restart the daemon
 gpm version           # show the installed version
 ```
+
+(Homebrew users update with `brew upgrade gpm`.)
 
 **From source** (for development):
 
